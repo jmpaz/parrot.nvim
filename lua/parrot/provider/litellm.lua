@@ -1,69 +1,46 @@
 local OpenAI = require("parrot.provider.openai")
-local Ollama = require("parrot.provider.ollama")
 local logger = require("parrot.logger")
 local utils = require("parrot.utils")
 
----@class LiteLLM
----@field endpoint string
----@field api_key string|table
----@field name string
-local LiteLLM = {}
+local LiteLLM = setmetatable({}, { __index = OpenAI })
 LiteLLM.__index = LiteLLM
 
-setmetatable(LiteLLM, {
-  __index = function(t, k)
-    return OpenAI[k] or Ollama[k] or rawget(t, k)
-  end
-})
-
--- Creates a new LiteLLM instance
----@param endpoint string
----@param api_key string|table
----@return LiteLLM
 function LiteLLM:new(endpoint, api_key)
-  return setmetatable({
-    endpoint = endpoint,
-    api_key = api_key,
-    name = "litellm",
-  }, self)
+  local obj = setmetatable(OpenAI:new(endpoint, api_key), self)
+  obj.name = "litellm"
+  return obj
 end
 
--- Override the get_available_models function to fetch models from litellm
----@param online boolean Whether to fetch models online
----@return string[]
-function LiteLLM:get_available_models(online)
-  if online and self:verify() then
-    local job = require("plenary.job"):new({
-      command = "curl",
-      args = {
-        self.endpoint:gsub("/chat/completions$", "/models"),
-        "-H",
-        "Authorization: Bearer " .. self.api_key,
-      },
-      on_exit = function(job)
-        local parsed_response = utils.parse_raw_response(job:result())
-        self:process_onexit(parsed_response)
-        local ids = {}
-        local success, decoded = pcall(vim.json.decode, parsed_response)
-        if success and decoded.data then
-          for _, item in ipairs(decoded.data) do
-            table.insert(ids, item.id)
-          end
-        else
-          logger.error("Failed to fetch models from litellm")
-        end
-        return ids
-      end,
-    })
-    job:start()
-    job:wait()
+function LiteLLM:process_stdout(response)
+  if response:match("chat%.completion%.chunk") or response:match("chat%.completion") then
+    local success, content = pcall(vim.json.decode, response)
+    if success and content.choices and content.choices[1] then
+      if content.choices[1].delta and content.choices[1].delta.content then
+        return content.choices[1].delta.content
+      elseif content.choices[1].message and content.choices[1].message.content then
+        return content.choices[1].message.content
+      end
+    end
   end
-  
-  -- Fallback to a default list if online fetching fails
-  return {
-    "claude-haiku",
-    "claude-sonnet",
-  }
+  logger.debug("LiteLLM could not process response: " .. response)
+end
+
+function LiteLLM:process_onexit(res)
+  local success, parsed = pcall(vim.json.decode, res)
+  if success then
+    if parsed.error then
+      logger.error(string.format(
+        "LiteLLM - code: %s message: %s type: %s",
+        parsed.error.code or "",
+        parsed.error.message or "",
+        parsed.error.type or ""
+      ))
+    elseif parsed.choices and parsed.choices[1] and parsed.choices[1].message then
+      return parsed.choices[1].message.content
+    end
+  else
+    logger.error("LiteLLM - Failed to parse JSON response: " .. res)
+  end
 end
 
 return LiteLLM
