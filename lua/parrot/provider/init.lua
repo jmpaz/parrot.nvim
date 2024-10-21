@@ -8,6 +8,7 @@ local OpenAI = require("parrot.provider.openai")
 local Perplexity = require("parrot.provider.perplexity")
 local GitHub = require("parrot.provider.github")
 local xAI = require("parrot.provider.xai")
+local LiteLLM = require("parrot.provider.litellm")
 local logger = require("parrot.logger")
 
 local M = {}
@@ -24,6 +25,7 @@ M.init_provider = function(prov_name, endpoint, api_key)
     groq = Groq,
     mistral = Mistral,
     nvidia = Nvidia,
+    litellm = LiteLLM,
     ollama = Ollama,
     openai = OpenAI,
     pplx = Perplexity,
