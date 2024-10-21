@@ -1516,15 +1516,24 @@ function ChatHandler:query(buf, provider, payload, handler, on_exit)
     on_exit = function(response, exit_code)
       logger.debug("on_exit: " .. vim.inspect(response:result()))
       if exit_code ~= 0 then
-        logger.error("An error occured calling curl .. " .. table.concat(curl_params, " "))
+        logger.error("An error occurred calling curl .. " .. table.concat(curl_params, " "))
         if on_exit then
           on_exit(qid)
         end
+        return
       end
       local result = response:result()
       result = utils.parse_raw_response(result)
 
-      local exit_content = provider:process_onexit(result)
+      local exit_content, error = provider:process_onexit(result)
+      if error then
+        logger.error("Error processing response: " .. vim.inspect(error))
+        if on_exit then
+          on_exit(qid)
+        end
+        return
+      end
+
       if exit_content then
         local qt = self.queries:get(qid)
         if not qt then

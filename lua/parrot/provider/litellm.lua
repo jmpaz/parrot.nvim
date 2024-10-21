@@ -69,16 +69,19 @@ function LiteLLM:process_onexit(res)
   local success, parsed = pcall(vim.json.decode, res)
   if success then
     if parsed.error then
-      local error_message = vim.inspect(parsed.error)
-      logger.error(string.format("LiteLLM - Error: %s", error_message))
+      logger.error(string.format("LiteLLM - Error: %s", vim.inspect(parsed.error)))
+      return nil, parsed.error
     elseif parsed.choices and parsed.choices[1] and parsed.choices[1].message then
       return parsed.choices[1].message.content
     else
       logger.error("LiteLLM - Unexpected response structure: " .. vim.inspect(parsed))
+      return nil, "Unexpected response structure"
     end
   else
     logger.error("LiteLLM - Failed to parse JSON response: " .. res)
+    return nil, "Failed to parse JSON response"
   end
 end
+
 
 return LiteLLM
