@@ -90,6 +90,19 @@ local defaults = {
         command = { temperature = 1.5, top_p = 1, num_ctx = 8192, min_p = 0.05 },
       },
     },
+    litellm = {
+      api_key = "",
+      endpoint = "http://localhost:8000/v1/chat/completions",
+      topic_prompt = topic_prompt,
+      topic = {
+        model = "claude-haiku",
+        params = { max_tokens = 64 },
+      },
+      params = {
+        chat = { temperature = 1.1, top_p = 1 },
+        command = { temperature = 1.1, top_p = 1 },
+      },
+    },
     anthropic = {
       api_key = "",
       endpoint = "https://api.anthropic.com/v1/messages",
